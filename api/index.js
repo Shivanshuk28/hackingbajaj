@@ -1,7 +1,8 @@
 const express = require('express');
-const serverless = require('serverless-http'); // ✅ required for Vercel
+const serverless = require('serverless-http');
 const axios = require('axios');
 const pdfParse = require('pdf-parse');
+require('dotenv').config(); // ✅ load env variables
 
 const app = express();
 app.use(express.json());
@@ -28,15 +29,17 @@ app.post('/ask', async (req, res) => {
           parts: [
             {
               text: `Context:\n${extractedText}\n\nCompress the following text while keeping all important details.
-Make it shorter and information-dense but do not miss any information, only shorten all the sentences by removing the unnecessary part of that sentence, return the result in a paragraph form `
+Make it shorter and information-dense but do not miss any information, only shorten all the sentences by removing the unnecessary part of that sentence, return the result in a paragraph form`
             }
           ]
         }
       ]
     };
 
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY; // ✅ from .env
+
     const textSummary = await axios.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_API_KEY',
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       prompt,
       {
         headers: {
@@ -52,7 +55,7 @@ Make it shorter and information-dense but do not miss any information, only shor
           parts: [
             {
               text: `Context:\n${textSummary.data.candidates?.[0]?.content?.parts?.[0]?.text}\n\nAnswer these:\n` +
-                    questions.map((q, i) => `${i + 1}. ${q}`).join('\n')
+                questions.map((q, i) => `${i + 1}. ${q}`).join('\n')
             }
           ]
         }
@@ -60,7 +63,7 @@ Make it shorter and information-dense but do not miss any information, only shor
     };
 
     const geminiResponse = await axios.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_API_KEY',
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       prompt,
       {
         headers: {
@@ -74,9 +77,9 @@ Make it shorter and information-dense but do not miss any information, only shor
     const answers = output.split(/\n(?=\d+\.\s)/)
       .map(line =>
         line.replace(/^\d+\.\s*/, '')
-            .replace(/\*\*(.*?)\*\*/g, '$1')
-            .replace(/\(\d+\.\d+\)/g, '')
-            .trim()
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/\(\d+\.\d+\)/g, '')
+          .trim()
       )
       .filter(Boolean);
 
@@ -87,6 +90,5 @@ Make it shorter and information-dense but do not miss any information, only shor
   }
 });
 
-// ✅ Export handler for Vercel
 module.exports = app;
 module.exports.handler = serverless(app);
